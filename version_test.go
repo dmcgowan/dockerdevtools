@@ -106,7 +106,7 @@ func TestOrdering(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if !Less(v1, v2) {
+		if !v1.LessThan(v2) {
 			t.Fatalf("Expected %v to be less than %v", tc.Before, tc.After)
 		}
 	}

@@ -63,39 +63,39 @@ func ParseVersion(s string) (v Version, err error) {
 	return
 }
 
-func Less(v1, v2 Version) bool {
-	if v1.VersionNumber[0] != v2.VersionNumber[0] {
-		return v1.VersionNumber[0] < v2.VersionNumber[0]
+func (v Version) LessThan(v2 Version) bool {
+	if v.VersionNumber[0] != v2.VersionNumber[0] {
+		return v.VersionNumber[0] < v2.VersionNumber[0]
 	}
-	if v1.VersionNumber[1] != v2.VersionNumber[1] {
-		return v1.VersionNumber[1] < v2.VersionNumber[1]
+	if v.VersionNumber[1] != v2.VersionNumber[1] {
+		return v.VersionNumber[1] < v2.VersionNumber[1]
 	}
-	if v1.VersionNumber[2] != v2.VersionNumber[2] {
-		return v1.VersionNumber[2] < v2.VersionNumber[2]
+	if v.VersionNumber[2] != v2.VersionNumber[2] {
+		return v.VersionNumber[2] < v2.VersionNumber[2]
 	}
-	if v1.Tag != v2.Tag {
-		if v1.Tag == "" {
+	if v.Tag != v2.Tag {
+		if v.Tag == "" {
 			// Final release always latest for version number
 			return false
 		}
 		if v2.Tag == "" {
 			return true
 		}
-		if v1.Tag == "dev" {
+		if v.Tag == "dev" {
 			// Dev branch is considered before a tag name is assigned
 			return true
 		}
-		if strings.HasPrefix(v1.Tag, "rc") && !strings.HasPrefix(v2.Tag, "rc") {
+		if strings.HasPrefix(v.Tag, "rc") && !strings.HasPrefix(v2.Tag, "rc") {
 			// rc is always last tag before final release
 			return false
 		}
-		return v1.Tag < v2.Tag
+		return v.Tag < v2.Tag
 	}
 
 	// This is only for consistent sort order, not
 	// for which version is newer/older. Need full commit
 	// history to make decision if on same branch
-	return v1.Commit < v2.Commit
+	return v.Commit < v2.Commit
 }
 
 var versionOutput = regexp.MustCompile(`Docker version ([a-z0-9-.]+), build ([a-f0-9]+(?:-dirty)?)`)
