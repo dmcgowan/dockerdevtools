@@ -3,6 +3,7 @@ package dockerdevtools
 import (
 	"errors"
 	"fmt"
+	"os/exec"
 	"regexp"
 	"strconv"
 	"strings"
@@ -95,4 +96,33 @@ func Less(v1, v2 Version) bool {
 	// for which version is newer/older. Need full commit
 	// history to make decision if on same branch
 	return v1.Commit < v2.Commit
+}
+
+var versionOutput = regexp.MustCompile(`Docker version ([a-z0-9-.]+), build ([a-f0-9]+(?:-dirty)?)`)
+
+func BinaryVersion(executable string) (Version, error) {
+	cmd := exec.Command(executable, "--version")
+	out, err := cmd.Output()
+	if err != nil {
+		return Version{}, err
+	}
+
+	matches := versionOutput.FindStringSubmatch(strings.TrimSpace(string(out)))
+	if len(matches) != 3 {
+		return Version{}, fmt.Errorf("unexpected response from version: %s", string(out))
+	}
+	v, err := ParseVersion(matches[1])
+	if err != nil {
+		return Version{}, err
+	}
+	v.Commit = matches[2]
+
+	return v, nil
+}
+
+func StaticVersion(major, minor, release int) Version {
+	return Version{
+		Name:          fmt.Sprintf("v%d.%d.%d", major, minor, release),
+		VersionNumber: [3]int{major, minor, release},
+	}
 }
