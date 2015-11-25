@@ -10,6 +10,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/dmcgowan/dockerdevtools/versionutil"
 )
 
 var (
@@ -26,7 +28,7 @@ func NewBuildCache(root string) *BuildCache {
 	}
 }
 
-func (bc *BuildCache) versionFile(v Version) string {
+func (bc *BuildCache) versionFile(v versionutil.Version) string {
 	if v.Commit != "" {
 		panic("cannot get release file with commit")
 	}
@@ -39,7 +41,7 @@ func (bc *BuildCache) versionFile(v Version) string {
 	return versionFile
 }
 
-func (bc *BuildCache) getCached(v Version) string {
+func (bc *BuildCache) getCached(v versionutil.Version) string {
 	if v.Commit != "" {
 		commitFile := filepath.Join(bc.root, v.Commit)
 		if _, err := os.Stat(commitFile); err == nil {
@@ -78,7 +80,7 @@ func (bc *BuildCache) cleanupTempFile(tmp *os.File) error {
 	return os.Remove(tmp.Name())
 }
 
-func (bc *BuildCache) saveVersion(tmp *os.File, v Version) (string, error) {
+func (bc *BuildCache) saveVersion(tmp *os.File, v versionutil.Version) (string, error) {
 	source := tmp.Name()
 	if err := tmp.Close(); err != nil {
 		log.Printf("Failed to close temp file %v: %s", tmp.Name(), err)
@@ -92,11 +94,11 @@ func (bc *BuildCache) saveVersion(tmp *os.File, v Version) (string, error) {
 	return target, nil
 }
 
-func (bc *BuildCache) IsCached(v Version) bool {
+func (bc *BuildCache) IsCached(v versionutil.Version) bool {
 	return bc.getCached(v) != ""
 }
 
-func (bc *BuildCache) PutVersion(v Version, source string) error {
+func (bc *BuildCache) PutVersion(v versionutil.Version, source string) error {
 	cached := bc.getCached(v)
 	if err := CopyFile(source, cached, 0755); err != nil {
 		return err
@@ -112,7 +114,7 @@ func (bc *BuildCache) PutVersion(v Version, source string) error {
 	return nil
 }
 
-func (bc *BuildCache) InstallVersion(v Version, target string) error {
+func (bc *BuildCache) InstallVersion(v versionutil.Version, target string) error {
 	cached := bc.getCached(v)
 	var cachedInit string
 	if cached == "" {

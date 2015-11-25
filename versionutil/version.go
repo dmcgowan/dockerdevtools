@@ -1,4 +1,7 @@
-package dockerdevtools
+// package versionutil provides utility functions
+// for working with versions of Docker including
+// parsing, comparing, and retrieving information.
+package versionutil
 
 import (
 	"errors"
@@ -9,6 +12,8 @@ import (
 	"strings"
 )
 
+// Version represents a specific release or build of
+// Docker.
 type Version struct {
 	Name          string
 	VersionNumber [3]int
@@ -39,6 +44,8 @@ var (
 	versionRegexp = regexp.MustCompile(`v?([0-9]+).([0-9]+).([0-9]+)(?:-([a-z][a-z0-9]+))?(?:@([a-f0-9]+(?:-dirty)?))?`)
 )
 
+// ParseVersion parses a version string as used by
+// Docker version command and git tags.
 func ParseVersion(s string) (v Version, err error) {
 	submatches := versionRegexp.FindStringSubmatch(s)
 	if len(submatches) != 6 {
@@ -63,6 +70,8 @@ func ParseVersion(s string) (v Version, err error) {
 	return
 }
 
+// LessThan returns true if the provided version is less
+// than the version.
 func (v Version) LessThan(v2 Version) bool {
 	if v.VersionNumber[0] != v2.VersionNumber[0] {
 		return v.VersionNumber[0] < v2.VersionNumber[0]
@@ -100,6 +109,7 @@ func (v Version) LessThan(v2 Version) bool {
 
 var versionOutput = regexp.MustCompile(`Docker version ([a-z0-9-.]+), build ([a-f0-9]+(?:-dirty)?)`)
 
+// BinaryVersion gets the Docker version for the provided Docker binary
 func BinaryVersion(executable string) (Version, error) {
 	cmd := exec.Command(executable, "--version")
 	out, err := cmd.Output()
@@ -120,6 +130,9 @@ func BinaryVersion(executable string) (Version, error) {
 	return v, nil
 }
 
+// StaticVersion returns a version object for the given
+// version number. This can be useful to compare a version
+// against a specific release.
 func StaticVersion(major, minor, release int) Version {
 	return Version{
 		Name:          fmt.Sprintf("v%d.%d.%d", major, minor, release),

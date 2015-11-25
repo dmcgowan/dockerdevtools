@@ -1,4 +1,4 @@
-package dockerdevtools
+package versionutil
 
 import "testing"
 
