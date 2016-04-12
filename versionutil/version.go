@@ -1,4 +1,4 @@
-// package versionutil provides utility functions
+// Package versionutil provides utility functions
 // for working with versions of Docker including
 // parsing, comparing, and retrieving information.
 package versionutil
@@ -21,19 +21,33 @@ type Version struct {
 	Commit        string
 }
 
+func (v Version) String() string {
+	s := v.Name
+	if v.Commit != "" {
+		s += "@" + v.Commit
+	}
+	return s
+}
+
 func (v Version) downloadURL(os, arch string) string {
 	// downloadLocation
 	// Install release
 	// https://get.docker.com/builds/Linux/x86_64/docker-1.9.0
 	// Install non release
-	// https://test.docker.com/builds/Linux/x86_64/docker-1.9.0-rc5
+	// https://test.docker.com/builds/Linux/x86_64/docker-1.9.0-rc5[.tgz]
 	// Install experimental
 	// https://experimental.docker.com/builds/Linux/x86_64/docker-latest
+	suffix := ".tgz"
+	tarVersion := StaticVersion(1, 11, 0)
+	tarVersion.Tag = "rc1"
+	if v.LessThan(tarVersion) {
+		suffix = ""
+	}
 	if v.Tag == "" {
-		return fmt.Sprintf("https://get.docker.com/builds/%s/%s/docker-%d.%d.%d", os, arch, v.VersionNumber[0], v.VersionNumber[1], v.VersionNumber[2])
+		return fmt.Sprintf("https://get.docker.com/builds/%s/%s/docker-%d.%d.%d%s", os, arch, v.VersionNumber[0], v.VersionNumber[1], v.VersionNumber[2], suffix)
 	}
 	if strings.HasPrefix(v.Tag, "rc") {
-		return fmt.Sprintf("https://test.docker.com/builds/%s/%s/docker-%d.%d.%d-%s", os, arch, v.VersionNumber[0], v.VersionNumber[1], v.VersionNumber[2], v.Tag)
+		return fmt.Sprintf("https://test.docker.com/builds/%s/%s/docker-%d.%d.%d-%s%s", os, arch, v.VersionNumber[0], v.VersionNumber[1], v.VersionNumber[2], v.Tag, suffix)
 	}
 
 	return ""
@@ -41,7 +55,7 @@ func (v Version) downloadURL(os, arch string) string {
 }
 
 var (
-	versionRegexp = regexp.MustCompile(`v?([0-9]+).([0-9]+).([0-9]+)(?:-([a-z][a-z0-9]+))?(?:@([a-f0-9]+(?:-dirty)?))?`)
+	versionRegexp = regexp.MustCompile(`v?([0-9]+).([0-9]+).([0-9]+)(?:-([a-z][a-z0-9]+))*(?:@([a-f0-9]+(?:-dirty)?))?`)
 )
 
 // ParseVersion parses a version string as used by
@@ -66,6 +80,10 @@ func ParseVersion(s string) (v Version, err error) {
 	}
 	v.Tag = submatches[4]
 	v.Commit = submatches[5]
+
+	if v.Commit != "" {
+		v.Name = v.Name[0 : len(v.Name)-len(v.Commit)-1]
+	}
 
 	return
 }

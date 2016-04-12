@@ -8,10 +8,13 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 
+	"github.com/Sirupsen/logrus"
 	"github.com/dmcgowan/dockertools/versionutil"
+	"github.com/docker/distribution/digest"
 )
 
 var (
@@ -61,6 +64,7 @@ func (bc *fsBuildCache) versionFile(v versionutil.Version) string {
 }
 
 func (bc *fsBuildCache) getCached(v versionutil.Version) string {
+	logrus.Debugf("Looking for cached version of %s", v)
 	if v.Commit != "" {
 		commitFile := filepath.Join(bc.root, v.Commit)
 		if _, err := os.Stat(commitFile); err == nil {
@@ -73,6 +77,7 @@ func (bc *fsBuildCache) getCached(v versionutil.Version) string {
 	if _, err := os.Stat(versionFile); err == nil {
 		return versionFile
 	}
+	logrus.Debugf("Could not find version file at %s", versionFile)
 
 	return ""
 }
@@ -117,8 +122,35 @@ func (bc *fsBuildCache) IsCached(v versionutil.Version) bool {
 	return bc.getCached(v) != ""
 }
 
+func binaryDigest(source string) (digest.Digest, error) {
+	f, err := os.Open(source)
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+	return digest.FromReader(f)
+}
+
 func (bc *fsBuildCache) PutVersion(v versionutil.Version, source string) error {
 	cached := bc.getCached(v)
+	if cached != "" {
+		sourceDgst, err := binaryDigest(source)
+		if err != nil {
+			return err
+		}
+		cachedDgst, err := binaryDigest(cached)
+		if err != nil {
+			return err
+		}
+		if sourceDgst == cachedDgst {
+			return nil
+		}
+		logrus.Debugf("Overwriting %s with %s", cached, source)
+	} else if v.Commit != "" {
+		cached = filepath.Join(bc.root, v.Commit)
+	} else {
+		cached = bc.versionFile(v)
+	}
 	if err := CopyFile(source, cached, 0755); err != nil {
 		return err
 	}
@@ -133,48 +165,8 @@ func (bc *fsBuildCache) PutVersion(v versionutil.Version, source string) error {
 	return nil
 }
 
-func (bc *fsBuildCache) InstallVersion(v versionutil.Version, target string) error {
-	cached := bc.getCached(v)
-	var cachedInit string
-	if cached == "" {
-		if v.Commit != "" {
-			return ErrCannotDownloadCommit
-		}
-		resp, err := http.Get(v.DownloadURL())
-		if err != nil {
-			return err
-		}
-
-		tf, err := bc.tempFile()
-		if err != nil {
-			return err
-		}
-
-		_, err = io.Copy(tf, resp.Body)
-		if err != nil {
-			if err := bc.cleanupTempFile(tf); err != nil {
-				// Just log
-				log.Printf("Error cleaning up temp file %v: %s", tf.Name(), err)
-			}
-			return err
-		}
-
-		cached, err = bc.saveVersion(tf, v)
-		if err != nil {
-			return err
-		}
-
-		// Remove any "-init"
-		cachedInit = initFile(cached)
-		if _, err := os.Stat(cachedInit); err == nil {
-			if err := os.Remove(cachedInit); err != nil {
-				return err
-			}
-		}
-	} else {
-		cachedInit = initFile(cached)
-	}
-
+// installLegacyDocker install pre 1.11 binaries
+func installLegacyDocker(cached, cachedInit, target string) error {
 	if err := CopyFile(cached, target, 0755); err != nil {
 		return err
 	}
@@ -194,6 +186,83 @@ func (bc *fsBuildCache) InstallVersion(v versionutil.Version, target string) err
 			return err
 		}
 		return vf.Close()
+	}
+
+	return nil
+}
+
+func (bc *fsBuildCache) InstallVersion(v versionutil.Version, target string) error {
+	cached := bc.getCached(v)
+	if cached == "" {
+		logrus.Debugf("No cached file, downloading")
+		if v.Commit != "" {
+			return ErrCannotDownloadCommit
+		}
+		resp, err := http.Get(v.DownloadURL())
+		if err != nil {
+			return err
+		}
+
+		tf, err := bc.tempFile()
+		if err != nil {
+			return err
+		}
+
+		logrus.Debugf("Copying to %s", tf)
+		_, err = io.Copy(tf, resp.Body)
+		if err != nil {
+			if err := bc.cleanupTempFile(tf); err != nil {
+				// Just log
+				log.Printf("Error cleaning up temp file %v: %s", tf.Name(), err)
+			}
+			return err
+		}
+
+		logrus.Debugf("Saving file %s", tf)
+		cached, err = bc.saveVersion(tf, v)
+		if err != nil {
+			return err
+		}
+	} else {
+		logrus.Debugf("Found cached file %s", cached)
+	}
+
+	// If Less than 1.11
+	nonLegacyVersion := versionutil.StaticVersion(1, 11, 0)
+	nonLegacyVersion.Tag = "rc1"
+	if v.LessThan(nonLegacyVersion) {
+		cachedInit := initFile(cached)
+
+		if err := installLegacyDocker(cached, cachedInit, filepath.Join(target, "docker")); err != nil {
+			return err
+		}
+		return nil
+	}
+
+	logrus.Debugf("Installing multi-binary version %s", v)
+
+	td, err := ioutil.TempDir("", "")
+	if err != nil {
+		return err
+	}
+	defer os.RemoveAll(td)
+
+	if err := exec.Command("tar", "-xzf", cached, "-C", td).Run(); err != nil {
+		return fmt.Errorf("error untarring: %v", err)
+	}
+
+	binRoot := filepath.Join(td, "docker")
+	fis, err := ioutil.ReadDir(binRoot)
+	if err != nil {
+		return err
+	}
+	for _, fi := range fis {
+		name := fi.Name()
+		finalPath := filepath.Join(target, name)
+		logrus.Debugf("Installing %s to %s", name, finalPath)
+		if err := CopyFile(filepath.Join(binRoot, name), finalPath, 0755); err != nil {
+			return err
+		}
 	}
 
 	return nil
