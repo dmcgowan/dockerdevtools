@@ -1,4 +1,4 @@
-package dockerdevtools
+package buildutil
 
 import (
 	"errors"
@@ -11,24 +11,43 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/dmcgowan/dockerdevtools/versionutil"
+	"github.com/dmcgowan/dockertools/versionutil"
 )
 
 var (
+	// ErrCannotDownloadCommit is used when downloading is required but
+	// a build has been specified by commit hash.
 	ErrCannotDownloadCommit = errors.New("cannot download build by commit")
 )
 
-type BuildCache struct {
+// BuildCache is a cache for storing specific versions of Docker
+type BuildCache interface {
+	// IsCached returns whether or not the version exist in the cache
+	IsCached(versionutil.Version) bool
+
+	// PutVersion puts the given file path in the cache using the
+	// provided version for the cache.
+	PutVersion(versionutil.Version, string) error
+
+	// InstallVersion installs the provided version to the given
+	// location. If the version cannot be retrieved an error will
+	// be returned.
+	InstallVersion(versionutil.Version, string) error
+}
+
+type fsBuildCache struct {
 	root string
 }
 
-func NewBuildCache(root string) *BuildCache {
-	return &BuildCache{
+// NewFSBuildCache returns a build cache using the provided
+// root directory as the cache storage.
+func NewFSBuildCache(root string) BuildCache {
+	return &fsBuildCache{
 		root: root,
 	}
 }
 
-func (bc *BuildCache) versionFile(v versionutil.Version) string {
+func (bc *fsBuildCache) versionFile(v versionutil.Version) string {
 	if v.Commit != "" {
 		panic("cannot get release file with commit")
 	}
@@ -41,7 +60,7 @@ func (bc *BuildCache) versionFile(v versionutil.Version) string {
 	return versionFile
 }
 
-func (bc *BuildCache) getCached(v versionutil.Version) string {
+func (bc *fsBuildCache) getCached(v versionutil.Version) string {
 	if v.Commit != "" {
 		commitFile := filepath.Join(bc.root, v.Commit)
 		if _, err := os.Stat(commitFile); err == nil {
@@ -69,18 +88,18 @@ func initFile(f string) string {
 
 }
 
-func (bc *BuildCache) tempFile() (*os.File, error) {
+func (bc *fsBuildCache) tempFile() (*os.File, error) {
 	return ioutil.TempFile(bc.root, "tmp-")
 }
 
-func (bc *BuildCache) cleanupTempFile(tmp *os.File) error {
+func (bc *fsBuildCache) cleanupTempFile(tmp *os.File) error {
 	if err := tmp.Close(); err != nil {
 		log.Printf("Failed to close temp file %v: %s", tmp.Name(), err)
 	}
 	return os.Remove(tmp.Name())
 }
 
-func (bc *BuildCache) saveVersion(tmp *os.File, v versionutil.Version) (string, error) {
+func (bc *fsBuildCache) saveVersion(tmp *os.File, v versionutil.Version) (string, error) {
 	source := tmp.Name()
 	if err := tmp.Close(); err != nil {
 		log.Printf("Failed to close temp file %v: %s", tmp.Name(), err)
@@ -94,11 +113,11 @@ func (bc *BuildCache) saveVersion(tmp *os.File, v versionutil.Version) (string, 
 	return target, nil
 }
 
-func (bc *BuildCache) IsCached(v versionutil.Version) bool {
+func (bc *fsBuildCache) IsCached(v versionutil.Version) bool {
 	return bc.getCached(v) != ""
 }
 
-func (bc *BuildCache) PutVersion(v versionutil.Version, source string) error {
+func (bc *fsBuildCache) PutVersion(v versionutil.Version, source string) error {
 	cached := bc.getCached(v)
 	if err := CopyFile(source, cached, 0755); err != nil {
 		return err
@@ -114,7 +133,7 @@ func (bc *BuildCache) PutVersion(v versionutil.Version, source string) error {
 	return nil
 }
 
-func (bc *BuildCache) InstallVersion(v versionutil.Version, target string) error {
+func (bc *fsBuildCache) InstallVersion(v versionutil.Version, target string) error {
 	cached := bc.getCached(v)
 	var cachedInit string
 	if cached == "" {
@@ -164,17 +183,17 @@ func (bc *BuildCache) InstallVersion(v versionutil.Version, target string) error
 	if _, err := os.Stat(cachedInit); err == nil {
 		// Create target file, check if name starts with docker, replace with dockerinit
 		return CopyFile(cachedInit, targetInit, 0755)
-	} else {
-		if _, err := os.Stat(targetInit); err == nil {
-			// Truncate file, do not remove since operator may only have access
-			// to file and not directory. Future calls may rely on overwriting
-			// the content of this file.
-			vf, err := os.OpenFile(targetInit, os.O_TRUNC|os.O_WRONLY, 0755)
-			if err != nil {
-				return err
-			}
-			return vf.Close()
+	}
+
+	if _, err := os.Stat(targetInit); err == nil {
+		// Truncate file, do not remove since operator may only have access
+		// to file and not directory. Future calls may rely on overwriting
+		// the content of this file.
+		vf, err := os.OpenFile(targetInit, os.O_TRUNC|os.O_WRONLY, 0755)
+		if err != nil {
+			return err
 		}
+		return vf.Close()
 	}
 
 	return nil

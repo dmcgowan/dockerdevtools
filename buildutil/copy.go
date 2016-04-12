@@ -1,4 +1,4 @@
-package dockerdevtools
+package buildutil
 
 import (
 	"fmt"
