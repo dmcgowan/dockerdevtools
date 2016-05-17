@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 
 	"github.com/Sirupsen/logrus"
-	"github.com/dmcgowan/dockertools/buildutil"
+	"github.com/dmcgowan/dockerdevtools/buildutil"
 )
 
 func main() {

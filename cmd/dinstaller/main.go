@@ -8,8 +8,8 @@ import (
 	"path/filepath"
 
 	"github.com/Sirupsen/logrus"
-	"github.com/dmcgowan/dockertools/buildutil"
-	"github.com/dmcgowan/dockertools/versionutil"
+	"github.com/dmcgowan/dockerdevtools/buildutil"
+	"github.com/dmcgowan/dockerdevtools/versionutil"
 )
 
 func main() {

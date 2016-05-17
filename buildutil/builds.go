@@ -13,7 +13,7 @@ import (
 	"strings"
 
 	"github.com/Sirupsen/logrus"
-	"github.com/dmcgowan/dockertools/versionutil"
+	"github.com/dmcgowan/dockerdevtools/versionutil"
 	"github.com/docker/distribution/digest"
 )
 

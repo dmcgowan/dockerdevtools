@@ -11,7 +11,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/dmcgowan/dockertools/buildutil"
+	"github.com/dmcgowan/dockerdevtools/buildutil"
 )
 
 var (
