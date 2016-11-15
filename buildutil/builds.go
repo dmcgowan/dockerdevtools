@@ -260,6 +260,10 @@ func (bc *fsBuildCache) InstallVersion(v versionutil.Version, target string) err
 	}
 	for _, fi := range fis {
 		name := fi.Name()
+		if fi.IsDir() {
+			logrus.Debugf("Skipping installation of directory: %s", name)
+			continue
+		}
 		finalPath := filepath.Join(target, name)
 		logrus.Debugf("Installing %s to %s", name, finalPath)
 		if err := CopyFile(filepath.Join(binRoot, name), finalPath, 0755); err != nil {
