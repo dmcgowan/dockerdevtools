@@ -198,7 +198,9 @@ func (bc *fsBuildCache) InstallVersion(v versionutil.Version, target string) err
 		if v.Commit != "" {
 			return ErrCannotDownloadCommit
 		}
-		resp, err := http.Get(v.DownloadURL())
+		downloadURL := v.DownloadURL()
+		logrus.Debugf("Downloading from %s", downloadURL)
+		resp, err := http.Get(downloadURL)
 		if err != nil {
 			return err
 		}
