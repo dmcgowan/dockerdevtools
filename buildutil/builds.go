@@ -55,7 +55,7 @@ func (bc *fsBuildCache) versionFile(v versionutil.Version) string {
 		panic("cannot get release file with commit")
 	}
 
-	versionFile := filepath.Join(bc.root, fmt.Sprintf("%d.%d.%d", v.VersionNumber[0], v.VersionNumber[1], v.VersionNumber[2]))
+	versionFile := filepath.Join(bc.root, v.VersionString())
 	if v.Tag != "" {
 		versionFile = versionFile + "-" + v.Tag
 	}
@@ -199,6 +199,9 @@ func (bc *fsBuildCache) InstallVersion(v versionutil.Version, target string) err
 			return ErrCannotDownloadCommit
 		}
 		downloadURL := v.DownloadURL()
+		if downloadURL == "" {
+			return fmt.Errorf("failed to get download location for %#v", v)
+		}
 		logrus.Debugf("Downloading from %s", downloadURL)
 		resp, err := http.Get(downloadURL)
 		if err != nil {

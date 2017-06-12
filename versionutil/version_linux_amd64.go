@@ -4,5 +4,5 @@ package versionutil
 // operating system and architecture for the system
 // being built for.
 func (v Version) DownloadURL() string {
-	return v.downloadURL("Linux", "x86_64")
+	return v.downloadURL("linux", "x86_64")
 }
