@@ -4,8 +4,8 @@ import (
 	"flag"
 	"path/filepath"
 
-	"github.com/Sirupsen/logrus"
 	"github.com/dmcgowan/dockerdevtools/buildutil"
+	"github.com/sirupsen/logrus"
 )
 
 func main() {

@@ -7,9 +7,9 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/Sirupsen/logrus"
 	"github.com/dmcgowan/dockerdevtools/buildutil"
 	"github.com/dmcgowan/dockerdevtools/versionutil"
+	"github.com/sirupsen/logrus"
 )
 
 func main() {
