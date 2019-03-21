@@ -56,14 +56,20 @@ func (v Version) downloadURL(os, arch string) string {
 		}
 	}
 
-	if strings.HasPrefix(v.Tag, "ce") {
+	if strings.HasPrefix(v.Tag, "ce") || (v.Tag == "" && v.versionNumber[0] >= 18) {
 		channel := "stable"
 		if strings.HasPrefix(v.Tag, "ce-rc") {
 			channel = "test"
 		}
 		// TODO: Support edge channel
 
-		return fmt.Sprintf("https://download.docker.com/%s/static/%s/%s/docker-%s-%s%s", os, channel, arch, v.VersionString(), v.Tag, suffix)
+		// Handles 18.09.0 and later which drop -ce
+		var endSuffix string
+		if v.Tag != "" {
+			suffix = "-" + v.Tag + suffix
+		}
+
+		return fmt.Sprintf("https://download.docker.com/%s/static/%s/%s/docker-%s%s.tgz", os, channel, arch, v.VersionString(), endSuffix)
 	}
 
 	return ""
@@ -71,7 +77,7 @@ func (v Version) downloadURL(os, arch string) string {
 }
 
 var (
-	versionRegexp = regexp.MustCompile(`v?([0-9]+).([0-9]+).([0-9]+)-((?:[a-z][a-z0-9]+)(?:-[a-z0-9_]+)*)(?:@([a-f0-9]+(?:-dirty)?))?`)
+	versionRegexp = regexp.MustCompile(`v?([0-9]+).([0-9]+).([0-9]+)(?:-((?:[a-z][a-z0-9]+)(?:-[a-z0-9_]+)*)(?:@([a-f0-9]+(?:-dirty)?))?)?`)
 )
 
 // ParseVersion parses a version string as used by
@@ -94,8 +100,10 @@ func ParseVersion(s string) (v Version, err error) {
 	if err != nil {
 		return
 	}
-	v.Tag = submatches[4]
-	v.Commit = submatches[5]
+	if len(submatches) > 3 {
+		v.Tag = submatches[4]
+		v.Commit = submatches[5]
+	}
 
 	if v.Commit != "" {
 		v.Name = v.Name[0 : len(v.Name)-len(v.Commit)-1]
